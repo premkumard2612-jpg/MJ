@@ -1,0 +1,84 @@
+name: Build MJ APK
+on:
+  workflow_dispatch:
+  push:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create gradle files
+        run: |
+          cat > settings.gradle.kts <<'EOF_MJ'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "MJ"
+          include(":app")
+          EOF_MJ
+          cat > build.gradle.kts <<'EOF_MJ'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF_MJ
+          cat > gradle.properties <<'EOF_MJ'
+          org.gradle.jvmargs=-Xmx2g
+          kotlin.code.style=official
+          EOF_MJ
+          cat > app/build.gradle.kts <<'EOF_MJ'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.boss.mj"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.boss.mj"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+          EOF_MJ
+      - name: Check files
+        run: find app -type f
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Build APK
+        run: gradle assembleDebug --no-daemon
+      - name: Publish APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mj-latest
+          name: MJ APK (latest)
+          files: app/build/outputs/apk/debug/app-debug.apk
